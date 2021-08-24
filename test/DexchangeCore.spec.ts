@@ -45,4 +45,61 @@ describe('DexchangeCore Test', () => {
         expect(await dexchangeCore.price(testERC20.address)).to.equal(expandTo18Decimals(2))
 
     })
+
+    it('添加兑换代币', async () => {
+
+        await expect(dexchangeCore.setPrice(testERC20.address, expandTo18Decimals(2)))
+            .to.be.emit(dexchangeCore, "PriceChanged").withArgs(testERC20.address,expandTo18Decimals(2));
+
+        expect(await dexchangeCore.price(testERC20.address)).to.equal(expandTo18Decimals(2))
+
+    })
+
+    it('修改兑换代币价格', async () => {
+        await expect(dexchangeCore.setPrice(testERC20.address, expandTo18Decimals(2)))
+            .to.be.emit(dexchangeCore, "PriceChanged").withArgs(testERC20.address,expandTo18Decimals(2));
+
+        expect(await dexchangeCore.price(testERC20.address)).to.equal(expandTo18Decimals(2));
+
+        await expect(dexchangeCore.setPrice(testERC20.address, expandTo18Decimals(4)))
+            .to.be.emit(dexchangeCore, "PriceChanged").withArgs(testERC20.address,expandTo18Decimals(4));
+
+        expect(await dexchangeCore.price(testERC20.address)).to.equal(expandTo18Decimals(4));
+
+    })
+  
+    it('删除兑换代币(兑率为0)', async () => {
+        await expect(dexchangeCore.setPrice(testERC20.address, expandTo18Decimals(2)))
+            .to.be.emit(dexchangeCore, "PriceChanged").withArgs(testERC20.address,expandTo18Decimals(2));
+
+        expect(await dexchangeCore.price(testERC20.address)).to.equal(expandTo18Decimals(2));
+
+        await expect(dexchangeCore.setPrice(testERC20.address, 0))
+            .to.be.emit(dexchangeCore, "PriceChanged").withArgs(testERC20.address,0);
+
+        expect(await dexchangeCore.price(testERC20.address)).to.equal(0);
+
+    })
+
+    it('无效合约地址', async () => {
+        await expect(dexchangeCore.setPrice(user.address, expandTo18Decimals(2)))
+            .to.be.revertedWith("DexchangeCore::setPrice: call to non-contract");
+        
+        await expect(dexchangeCore.setPrice(null, expandTo18Decimals(2)))
+        .to.be.reverted;
+    })
+    
+    it('兑率为空或小于0', async () => {        
+        await expect(dexchangeCore.setPrice(testERC20.address, null))
+        .to.be.reverted;
+        await expect(dexchangeCore.setPrice(testERC20.address, -1))
+        .to.be.reverted;
+    })
+    /*
+    it('兑率为一个超大的数', async () => {        
+        await expect(dexchangeCore.setPrice(testERC20.address, expandTo18Decimals(2*10**10)))
+        .to.be.reverted;
+    })*/
+
+
 })
