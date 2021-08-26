@@ -29,6 +29,7 @@ describe('DexIDOPool Test', () => {
     })
 
     it('Deploy pool', async () => {
+
         const { timestamp: now } = await provider.getBlock('latest')
 
         await expect(dexIDOPool.deploy(now + 10, 5 * DAYS, 50, dexchangeCore.address, top.address, {}))
@@ -43,12 +44,69 @@ describe('DexIDOPool Test', () => {
         await expect(dexIDOPool.deploy(now + 10, 5 * DAYS, 1001, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) }))
             .to.be.revertedWith('DexIDOPool::deploy: reward rate use permil')
 
+        await expect(dexIDOPool.deploy(now + 10, 5 * DAYS, 1000, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) }))
+            .to.be.revertedWith('DexIDOPool::deploy: reward rate use permil')
+
         await expect(dexIDOPool.connect(user).deploy(now + 10, 5 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) }))
             .to.be.revertedWith('Ownable: caller is not the owner')
 
         await expect(dexIDOPool.deploy(now + 2 * MINUTES, 5 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) }))
             .to.emit(dexIDOPool, 'Deployed')
             .withArgs(now + 2 * MINUTES, 5 * DAYS, expandTo18Decimals(100000), expandTo18Decimals(20000), 50, owner.address, dexchangeCore.address, top.address);
+    })
+
+
+    it('正确地添加矿池', async () => {
+
+        const { timestamp: now } = await provider.getBlock('latest');
+        
+        await expect(dexIDOPool.deploy(now + 2 * MINUTES, 5 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) }))
+        .to.emit(dexIDOPool, 'Deployed')
+        .withArgs(now + 2 * MINUTES, 5 * DAYS, expandTo18Decimals(100000), expandTo18Decimals(20000), 50, owner.address, dexchangeCore.address, top.address);
+
+        expect(dexIDOPool.poolStart()).eq(now + 2 * MINUTES)
+        expect(dexIDOPool.poolDuration()).eq(5 * DAYS)
+        expect(dexIDOPool.poolTotal()).eq(expandTo18Decimals(100000) )
+        expect(dexIDOPool.poolDailyLimit()).eq(expandTo18Decimals(100000).div(5))
+        expect(dexIDOPool.exchangedDaily()).eq(0)
+
+    })
+
+    it('矿池总量大于0', async () => {
+
+        const { timestamp: now } = await provider.getBlock('latest');
+
+        await expect(dexIDOPool.deploy(now + 10, 5 * DAYS, 50, dexchangeCore.address, top.address, {}))
+            .to.be.revertedWith('DexIDOPool::deploy: require sending DEX to the pool');
+
+        await expect(dexIDOPool.deploy(now + 2 * MINUTES, 5 * DAYS, 50, dexchangeCore.address, top.address, { value: 0 }))
+            .to.be.revertedWith('DexIDOPool::deploy: require sending DEX to the pool');
+
+    })
+
+    it('dexchange为一个有效的合约地址', async () => {
+
+        const { timestamp: now } = await provider.getBlock('latest');
+
+        await expect(dexIDOPool.deploy(now + 10, 5 * DAYS, 50, user.address, top.address, {value: expandTo18Decimals(100000)}))
+            .to.be.revertedWith("DexIDOPool::deploy: dexchangeCore is non-contract.");
+
+    })
+
+    it('不允许创建重复矿池', async () => {
+
+        const { timestamp: now } = await provider.getBlock('latest');
+        await dexIDOPool.deploy(now + 2 * MINUTES, 5 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) });
+        await expect(dexIDOPool.deploy(now + 2 * MINUTES, 4 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(200000) }))
+            .to.be.reverted;
+    })
+
+    it('矿池结束后创建矿池', async () => {
+
+        const { timestamp: now } = await provider.getBlock('latest');
+        await dexIDOPool.deploy(now, 1 * MINUTES, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) });
+        await expect(dexIDOPool.deploy(now + 2 * MINUTES, 4 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(200000) }))
+            .to.be.reverted;
     })
 
     it('Deposit', async () => {
