@@ -163,8 +163,8 @@ describe('DexIDOPool Test', () => {
 
         //多次质押
         await expect(dexIDOPool.connect(user).deposit({ value: expandTo18Decimals(2) }))
-        .to.emit(dexIDOPool, 'Deposited').withArgs(user.address, expandTo18Decimals(2))
-        
+            .to.emit(dexIDOPool, 'Deposited').withArgs(user.address, expandTo18Decimals(2))
+
         await expect(dexIDOPool.connect(user).deposit({ value: expandTo18Decimals(2) }))
             .to.emit(dexIDOPool, 'Deposited').withArgs(user.address, expandTo18Decimals(2))
 
@@ -176,7 +176,7 @@ describe('DexIDOPool Test', () => {
         expect(await dexIDOPool.availableToExchange(user.address)).to.equal(0)
 
 
-        
+
     })
 
     it('矿池未开始', async () => {
@@ -237,32 +237,6 @@ describe('DexIDOPool Test', () => {
 
     })
 
-    it('质押第二天可兑换dex', async () => {
-        const { timestamp: now } = await provider.getBlock('latest')
-
-        await dexIDOPool.deploy(now + 2 * MINUTES, 5 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) })
-
-        await mineBlock(provider, now + 3 * MINUTES)
-
-        await expect(dexIDOPool.connect(top).deposit({ value: expandTo18Decimals(2) }))
-            .to.emit(dexIDOPool, 'Deposited').withArgs(top.address, expandTo18Decimals(2))
-
-        expect(await dexIDOPool.availableToExchange(top.address)).to.equal(0)
-
-        await mineBlock(provider, now + 1 * DAYS + 3 * MINUTES)
-
-        expect(await dexIDOPool.availableToExchange(top.address)).to.equal(await dexIDOPool.poolDailyLimit())
-
-        await mineBlock(provider, now + 3 * DAYS + 3 * MINUTES)
-
-        expect(await dexIDOPool.availableToExchange(top.address)).to.equal(0)
-
-
-            
-    })
-
-
-/*
     it('Withdraw', async () => {
         const { timestamp: now } = await provider.getBlock('latest')
 
@@ -321,13 +295,16 @@ describe('DexIDOPool Test', () => {
         await dexIDOPool.start()
         await expect(await dexIDOPool.stopped()).to.equal(false);
 
-        await dexIDOPool.deploy(now + 2 * MINUTES, 5 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) })
+        await expect(dexIDOPool.deploy(now + 2 * MINUTES, 5 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) }))
+            .to.emit(dexIDOPool, 'Deposited')
     })
 
     it('Account available exchange DEX amount', async () => {
         var { timestamp: now } = await provider.getBlock('latest')
         await dexIDOPool.deploy(now + 2 * MINUTES, 180 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(1800000) })
         await mineBlock(provider, now + 2 * MINUTES)
+        const { timestamp: now1 } = await provider.getBlock('latest')
+        const daily = 10000
 
         await dexIDOPool.connect(top).deposit({ value: expandTo18Decimals(5000) })
         await dexIDOPool.connect(user).accept(top.address)
@@ -352,45 +329,72 @@ describe('DexIDOPool Test', () => {
         await expect(await dexIDOPool.availableToExchange(user3.address))
             .to.equal(expandTo18Decimals(0))
 
+        // 验证各变量变化是否正常
+        expect(await dexIDOPool.dailyDeposit(now1)).to.equal(expandTo18Decimals(100000))
+        expect(await dexIDOPool.balanceOf(user.address)).to.equal(expandTo18Decimals(40000))
+        expect(await dexIDOPool.dailyDepositOf(now1, user.address)).to.equal(expandTo18Decimals(40000))
+        expect(await dexIDOPool.availableToExchange(user.address)).to.equal(0)
+
         // DAY 2
         await mineBlock(provider, now + 1 * DAYS + 1 * HOURS)
+        var { timestamp: now2 } = await provider.getBlock('latest')
 
         // await dexIDOPool.connect(user).deposit({ value: expandTo18Decimals(0) })
-        await dexIDOPool.connect(user1).deposit({ value: expandTo18Decimals(5000) })
+        await dexIDOPool.connect(user1).deposit({ value: expandTo18Decimals(50000) })
         // await dexIDOPool.connect(user2).deposit({ value: expandTo18Decimals(0) })
-        await dexIDOPool.connect(user3).deposit({ value: expandTo18Decimals(5000) })
+        await dexIDOPool.connect(user3).deposit({ value: expandTo18Decimals(50000) })
 
-        await expect(await dexIDOPool.totalDeposit()).to.equal(expandTo18Decimals(110000))
 
-        await expect(await dexIDOPool.availableToExchange(user.address))
-            .to.equal(expandTo18Decimals(4000))
-        await expect(await dexIDOPool.availableToExchange(user1.address))
-            .to.equal(expandTo18Decimals(3000))
-        await expect(await dexIDOPool.availableToExchange(user2.address))
-            .to.equal(expandTo18Decimals(2000))
-        await expect(await dexIDOPool.availableToExchange(user3.address))
-            .to.equal(expandTo18Decimals(500))
+        // 验证各变量变化是否正常
+        expect(await dexIDOPool.totalDeposit()).to.equal(expandTo18Decimals(200000))
+        expect(await dexIDOPool.dailyDeposit(now2)).to.equal(expandTo18Decimals(100000))
+
+        expect(await dexIDOPool.balanceOf(user.address)).to.equal(expandTo18Decimals(40000))
+        expect(await dexIDOPool.balanceOf(user1.address)).to.equal(expandTo18Decimals(30000 + 50000))
+        expect(await dexIDOPool.balanceOf(user2.address)).to.equal(expandTo18Decimals(20000))
+        expect(await dexIDOPool.balanceOf(user3.address)).to.equal(expandTo18Decimals(5000 + 50000))
+
+        expect(await dexIDOPool.dailyDepositOf(now2, user.address)).to.equal(expandTo18Decimals(0))
+        expect(await dexIDOPool.dailyDepositOf(now2, user1.address)).to.equal(expandTo18Decimals(50000))
+        expect(await dexIDOPool.dailyDepositOf(now2, user2.address)).to.equal(expandTo18Decimals(0))
+        expect(await dexIDOPool.dailyDepositOf(now2, user3.address)).to.equal(expandTo18Decimals(50000))
+
+        expect(await dexIDOPool.availableToExchange(user.address)).to.equal(expandTo18Decimals(4000))
+        expect(await dexIDOPool.availableToExchange(user1.address)).to.equal(expandTo18Decimals(3000))
+        expect(await dexIDOPool.availableToExchange(user2.address)).to.equal(expandTo18Decimals(2000))
+        expect(await dexIDOPool.availableToExchange(user3.address)).to.equal(expandTo18Decimals(500))
+
 
         // DAY 3
         await mineBlock(provider, now + 2 * DAYS + 1 * HOURS)
+        var { timestamp: now3 } = await provider.getBlock('latest')
 
         // await dexIDOPool.connect(user).deposit({ value: expandTo18Decimals(0) })
         // await dexIDOPool.connect(user1).deposit({ value: expandTo18Decimals(5000) })
         // await dexIDOPool.connect(user2).deposit({ value: expandTo18Decimals(0) })
         // await dexIDOPool.connect(user3).deposit({ value: expandTo18Decimals(5000) })
 
-        await expect(await dexIDOPool.totalDeposit()).to.equal(expandTo18Decimals(110000))
+        // 验证各变量变化是否正常
+        expect(await dexIDOPool.totalDeposit()).to.equal(expandTo18Decimals(200000))
+        expect(await dexIDOPool.dailyDeposit(now3)).to.equal(expandTo18Decimals(0))
 
-        // expect(await dexIDOPool.availableToExchange(user.address))
-        //     .to.equal(3636363636363636363636)
-        // expect(await dexIDOPool.availableToExchange(user1.address))
-        //     .to.equal(expandTo18Decimals(2273))
-        // expect(await dexIDOPool.availableToExchange(user2.address))
-        //     .to.equal(expandTo18Decimals(2727))
-        // expect(await dexIDOPool.availableToExchange(user3.address))
-        //     .to.equal(expandTo18Decimals(1364))
+        expect(await dexIDOPool.balanceOf(user.address)).to.equal(expandTo18Decimals(40000))
+        expect(await dexIDOPool.balanceOf(user1.address)).to.equal(expandTo18Decimals(30000 + 50000))
+        expect(await dexIDOPool.balanceOf(user2.address)).to.equal(expandTo18Decimals(20000))
+        expect(await dexIDOPool.balanceOf(user3.address)).to.equal(expandTo18Decimals(5000 + 50000))
+
+        expect(await dexIDOPool.dailyDepositOf(now3, user.address)).to.equal(expandTo18Decimals(0))
+        expect(await dexIDOPool.dailyDepositOf(now3, user1.address)).to.equal(expandTo18Decimals(0))
+        expect(await dexIDOPool.dailyDepositOf(now3, user2.address)).to.equal(expandTo18Decimals(0))
+        expect(await dexIDOPool.dailyDepositOf(now3, user3.address)).to.equal(expandTo18Decimals(0))
+
+        expect(await dexIDOPool.availableToExchange(user.address)).to.equal(expandTo18Decimals(2000))
+        expect(await dexIDOPool.availableToExchange(user1.address)).to.equal(expandTo18Decimals(4000))
+        expect(await dexIDOPool.availableToExchange(user2.address)).to.equal(expandTo18Decimals(1000))
+        expect(await dexIDOPool.availableToExchange(user3.address)).to.equal(expandTo18Decimals(2750))
+
     })
-
+/*
     it('Accept invitation', async () => {
 
         var { timestamp: now } = await provider.getBlock('latest')
