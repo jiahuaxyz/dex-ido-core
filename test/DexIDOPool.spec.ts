@@ -67,11 +67,13 @@ describe('DexIDOPool Test', () => {
         .to.emit(dexIDOPool, 'Deployed')
         .withArgs(now + 2 * MINUTES, 5 * DAYS, expandTo18Decimals(100000), expandTo18Decimals(20000), 50, owner.address, dexchangeCore.address, top.address);
 
-        expect(dexIDOPool.poolStart()).eq(now + 2 * MINUTES)
-        expect(dexIDOPool.poolDuration()).eq(5 * DAYS)
-        expect(dexIDOPool.poolTotal()).eq(expandTo18Decimals(100000) )
-        expect(dexIDOPool.poolDailyLimit()).eq(expandTo18Decimals(100000).div(5))
-        expect(dexIDOPool.exchangedDaily()).eq(0)
+        expect(await dexIDOPool.poolStart()).eq(now + 2 * MINUTES);
+        expect(await dexIDOPool.poolDuration()).eq(5 * DAYS);
+        expect(await dexIDOPool.poolTotal()).eq(expandTo18Decimals(100000) );
+        expect(await dexIDOPool.poolDailyLimit()).eq(expandTo18Decimals(100000).div(5));
+        expect(await dexIDOPool.exchangedDaily(now)).eq(0);
+        expect(await dexIDOPool.totalDeposit()).eq(0);
+
 
     })
 
@@ -96,20 +98,21 @@ describe('DexIDOPool Test', () => {
 
     })
 
-    it('不允许创建重复矿池', async () => {
+    it('暂停状态下不可创建矿池', async () => {
 
         const { timestamp: now } = await provider.getBlock('latest');
-        await dexIDOPool.deploy(now + 2 * MINUTES, 5 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) });
-        await expect(dexIDOPool.deploy(now + 2 * MINUTES, 4 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(200000) }))
-            .to.be.reverted;
-    })
+        await dexIDOPool.stop()
 
-    it('矿池结束后创建矿池', async () => {
+        await expect(dexIDOPool.deploy(now + 2 * MINUTES, 5 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) }))
+            .to.be.revertedWith('DexIDOPool::stoppable: contract has been stopped.')
 
-        const { timestamp: now } = await provider.getBlock('latest');
-        await dexIDOPool.deploy(now, 1 * MINUTES, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) });
-        await expect(dexIDOPool.deploy(now + 2 * MINUTES, 4 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(200000) }))
-            .to.be.reverted;
+        await dexIDOPool.start()
+
+        await expect(dexIDOPool.deploy(now + 2 * MINUTES, 5 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) }))
+        .to.emit(dexIDOPool, 'Deployed')
+        .withArgs(now + 2 * MINUTES, 5 * DAYS, expandTo18Decimals(100000), expandTo18Decimals(20000), 50, owner.address, dexchangeCore.address, top.address);
+
+
     })
 
     it('Deposit', async () => {
@@ -133,6 +136,133 @@ describe('DexIDOPool Test', () => {
         await expect(balance).to.equal(expandTo18Decimals(2))
     })
 
+    it('正常质押', async () => {
+        const { timestamp: now } = await provider.getBlock('latest')
+
+        await dexIDOPool.deploy(now + 2 * MINUTES, 5 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) })
+
+        await mineBlock(provider, now + 3 * MINUTES)
+        const { timestamp: now2 } = await provider.getBlock('latest')
+
+        await expect(dexIDOPool.connect(top).deposit({ value: expandTo18Decimals(2) }))
+            .to.emit(dexIDOPool, 'Deposited').withArgs(top.address, expandTo18Decimals(2))
+
+        await dexIDOPool.connect(user).accept(top.address)
+        await expect(dexIDOPool.connect(user).deposit({ value: 0 }))
+            .to.be.revertedWith('DexIDOPool::deposit: require sending DEX to the pool')
+
+        await expect(dexIDOPool.connect(user).deposit({ value: expandTo18Decimals(2) }))
+            .to.emit(dexIDOPool, 'Deposited').withArgs(user.address, expandTo18Decimals(2))
+
+        // 验证各变量变化是否正常
+        expect(await dexIDOPool.totalDeposit()).to.equal(expandTo18Decimals(4))
+        expect(await dexIDOPool.dailyDeposit(now2)).to.equal(expandTo18Decimals(4))
+        expect(await dexIDOPool.balanceOf(user.address)).to.equal(expandTo18Decimals(2))
+        expect(await dexIDOPool.dailyDepositOf(now2, user.address)).to.equal(expandTo18Decimals(2))
+        expect(await dexIDOPool.availableToExchange(user.address)).to.equal(0)
+
+        //多次质押
+        await expect(dexIDOPool.connect(user).deposit({ value: expandTo18Decimals(2) }))
+        .to.emit(dexIDOPool, 'Deposited').withArgs(user.address, expandTo18Decimals(2))
+        
+        await expect(dexIDOPool.connect(user).deposit({ value: expandTo18Decimals(2) }))
+            .to.emit(dexIDOPool, 'Deposited').withArgs(user.address, expandTo18Decimals(2))
+
+        // 验证各变量变化是否正常
+        expect(await dexIDOPool.totalDeposit()).to.equal(expandTo18Decimals(8))
+        expect(await dexIDOPool.dailyDeposit(now2)).to.equal(expandTo18Decimals(8))
+        expect(await dexIDOPool.balanceOf(user.address)).to.equal(expandTo18Decimals(6))
+        expect(await dexIDOPool.dailyDepositOf(now2, user.address)).to.equal(expandTo18Decimals(6))
+        expect(await dexIDOPool.availableToExchange(user.address)).to.equal(0)
+
+
+        
+    })
+
+    it('矿池未开始', async () => {
+        const { timestamp: now } = await provider.getBlock('latest')
+
+        await dexIDOPool.deploy(now + 2 * MINUTES, 5 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) })
+
+        // await mineBlock(provider, now + 3 * MINUTES)
+
+        await expect(dexIDOPool.connect(top).deposit({ value: expandTo18Decimals(2) }))
+            .to.be.revertedWith('DexIDOPool::deposit: the pool not ready.')
+    })
+
+    it('矿池已结束', async () => {
+        const { timestamp: now } = await provider.getBlock('latest')
+
+        await dexIDOPool.deploy(now + 2 * MINUTES, 5 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) })
+
+        await mineBlock(provider, now + 6 * DAYS)
+
+        await expect(dexIDOPool.connect(top).deposit({ value: expandTo18Decimals(2) }))
+            .to.be.revertedWith('DexIDOPool::deposit: the pool already ended.')
+    })
+
+    it('矿池已暂停', async () => {
+        const { timestamp: now } = await provider.getBlock('latest')
+
+        await dexIDOPool.deploy(now + 2 * MINUTES, 5 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) })
+
+        await mineBlock(provider, now + 3 * MINUTES)
+
+        await dexIDOPool.stop()
+        expect(await dexIDOPool.stopped()).to.equal(true)
+        
+        await expect(dexIDOPool.connect(top).deposit({ value: expandTo18Decimals(2) }))
+            .to.be.revertedWith('DexIDOPool::stoppable: contract has been stopped.')
+
+        await dexIDOPool.start()
+        expect(await dexIDOPool.stopped()).to.equal(false)
+
+        await expect(dexIDOPool.connect(top).deposit({ value: expandTo18Decimals(2) }))
+            .to.emit(dexIDOPool, 'Deposited').withArgs(top.address, expandTo18Decimals(2))
+
+    })
+
+    it('最后一天质押', async () => {
+        const { timestamp: now } = await provider.getBlock('latest')
+
+        await dexIDOPool.deploy(now + 2 * MINUTES, 5 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) })
+
+        await mineBlock(provider, now + 5 * DAYS)
+
+        // await expect(dexIDOPool.connect(top).deposit({ value: expandTo18Decimals(2) }))
+        //     .to.be.reverted
+
+        await expect(dexIDOPool.connect(top).deposit({ value: expandTo18Decimals(2) }))
+            .to.emit(dexIDOPool, 'Deposited').withArgs(top.address, expandTo18Decimals(2))
+
+    })
+
+    it('质押第二天可兑换dex', async () => {
+        const { timestamp: now } = await provider.getBlock('latest')
+
+        await dexIDOPool.deploy(now + 2 * MINUTES, 5 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) })
+
+        await mineBlock(provider, now + 3 * MINUTES)
+
+        await expect(dexIDOPool.connect(top).deposit({ value: expandTo18Decimals(2) }))
+            .to.emit(dexIDOPool, 'Deposited').withArgs(top.address, expandTo18Decimals(2))
+
+        expect(await dexIDOPool.availableToExchange(top.address)).to.equal(0)
+
+        await mineBlock(provider, now + 1 * DAYS + 3 * MINUTES)
+
+        expect(await dexIDOPool.availableToExchange(top.address)).to.equal(await dexIDOPool.poolDailyLimit())
+
+        await mineBlock(provider, now + 3 * DAYS + 3 * MINUTES)
+
+        expect(await dexIDOPool.availableToExchange(top.address)).to.equal(0)
+
+
+            
+    })
+
+
+/*
     it('Withdraw', async () => {
         const { timestamp: now } = await provider.getBlock('latest')
 
@@ -615,4 +745,5 @@ describe('DexIDOPool Test', () => {
         await expect(poolAfter.sub(poolBefore)).be.equal(totalAmount)
 
     })
+    */
 })

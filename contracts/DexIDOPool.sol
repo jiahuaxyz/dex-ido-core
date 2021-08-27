@@ -98,6 +98,19 @@ contract DexIDOPool is ReentrancyGuard, Ownable {
         return _balanceOf[account];
     }
 
+    // total deposited amount
+    function dailyDeposit(uint256 date) public view returns (uint256) {
+        uint256 TODAY = (date - _poolInfo.start) / 1 days;
+        return _dailyDeposit[TODAY];
+        
+    }
+
+    // Daily deposited amount of the address in the pool
+    function dailyDepositOf(uint256 date, address account) public view returns (uint256) {
+        uint256 TODAY = (date - _poolInfo.start) / 1 days;
+        return _dailyDepositOf[TODAY][account];
+    }
+
     // available DEX amount for the account today
     function availableToExchange(address account) public view returns (uint256) {
         IDOPool storage pool = _poolInfo;
@@ -246,11 +259,11 @@ contract DexIDOPool is ReentrancyGuard, Ownable {
         uint256 _balance = _balanceOf[msg.sender];
         _balanceOf[msg.sender] = _balance.add(value);
 
-        uint256 dailyDeposit = _dailyDeposit[TODAY];
-        _dailyDeposit[TODAY] = dailyDeposit.add(value);
+        uint256 userDailyDeposit = _dailyDeposit[TODAY];
+        _dailyDeposit[TODAY] = userDailyDeposit.add(value);
 
-        uint256 dailyDepositOf = _dailyDepositOf[TODAY][msg.sender];
-        _dailyDepositOf[TODAY][msg.sender] = dailyDepositOf.add(value);
+        uint256 userDailyDepositOf = _dailyDepositOf[TODAY][msg.sender];
+        _dailyDepositOf[TODAY][msg.sender] = userDailyDepositOf.add(value);
 
         emit Deposited(msg.sender, value);
     }
