@@ -84,6 +84,8 @@ describe('DexchangeCore Test', () => {
         
         await expect(dexchangeCore.setPrice(null, expandTo18Decimals(2)))
         .to.be.reverted;
+        await expect(dexchangeCore.setPrice("", expandTo18Decimals(2)))
+        .to.be.reverted;
     })
     
     it('兑率为空或小于0', async () => {        

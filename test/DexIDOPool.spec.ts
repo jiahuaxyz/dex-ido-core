@@ -27,7 +27,7 @@ describe('DexIDOPool Test', () => {
         dexIDOPool = fixture.dexIDOPool
         await dexchangeCore.setPrice(testERC20.address, expandTo18Decimals(2))
     })
-
+/*
     it('Deploy pool', async () => {
 
         const { timestamp: now } = await provider.getBlock('latest')
@@ -237,66 +237,25 @@ describe('DexIDOPool Test', () => {
 
     })
 
-    it('Withdraw', async () => {
+    
+    it('无邀请关系进行质押', async () => {
         const { timestamp: now } = await provider.getBlock('latest')
 
         await dexIDOPool.deploy(now + 2 * MINUTES, 5 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) })
 
-        await mineBlock(provider, now + 3 * MINUTES)
+        await mineBlock(provider, now + 5 * MINUTES)
 
-        await expect(dexIDOPool.connect(user).withdraw(0))
-            .to.be.revertedWith('DexIDOPool::withdraw: the pool is not over, amount is invalid.')
-
+        await expect(dexIDOPool.connect(user).deposit({ value: expandTo18Decimals(2) }))
+            .to.revertedWith("DexIDOPool::deposit: you must have a referrer")
+        
         await dexIDOPool.connect(top).deposit({ value: expandTo18Decimals(2) })
         await dexIDOPool.connect(user).accept(top.address)
-        await dexIDOPool.connect(user).deposit({ value: expandTo18Decimals(2) })
 
-        await expect(dexIDOPool.connect(user).withdraw(expandTo18Decimals(3)))
-            .to.be.revertedWith('DexIDOPool::withdraw: the amount deposited today is not enough.')
+        await expect(dexIDOPool.connect(user).deposit({ value: expandTo18Decimals(2) }))
+            .to.emit(dexIDOPool,'Deposited')
+        
 
-        await dexIDOPool.connect(user).withdraw(expandTo18Decimals(1))
 
-        await mineBlock(provider, now + 3 * DAYS)
-
-        await expect(dexIDOPool.connect(user).withdraw(0))
-            .to.be.revertedWith('DexIDOPool::withdraw: the pool is not over, amount is invalid.')
-
-        await mineBlock(provider, now + 6 * DAYS)
-
-        await expect(await dexIDOPool.connect(user).withdraw(1))
-            .to.changeEtherBalance(user, expandTo18Decimals(1), {includeFee: false})
-
-        const totalDeposit = await dexIDOPool.totalDeposit();
-        await expect(totalDeposit).to.equal(expandTo18Decimals(2))
-
-        const balance = await dexIDOPool.balanceOf(user.address)
-        await expect(balance).to.equal(expandTo18Decimals(0))
-    })
-
-    it('Contract stoppable', async () => {
-
-        await dexIDOPool.stop()
-        await expect(await dexIDOPool.stopped()).to.equal(true);
-
-        var { timestamp: now } = await provider.getBlock('latest')
-
-        await expect(dexIDOPool.deploy(now + 2 * MINUTES, 5 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) }))
-            .to.be.revertedWith('DexIDOPool::stoppable: contract has been stopped.')
-
-        now = now + 3 * MINUTES
-        await mineBlock(provider, now)
-
-        await expect(dexIDOPool.connect(user).withdraw(0))
-            .to.be.revertedWith('DexIDOPool::stoppable: contract has been stopped.');
-
-        await expect(dexIDOPool.connect(user).start())
-            .to.be.revertedWith("Ownable: caller is not the owner")
-
-        await dexIDOPool.start()
-        await expect(await dexIDOPool.stopped()).to.equal(false);
-
-        await expect(dexIDOPool.deploy(now + 2 * MINUTES, 5 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) }))
-            .to.emit(dexIDOPool, 'Deposited')
     })
 
     it('Account available exchange DEX amount', async () => {
@@ -394,7 +353,130 @@ describe('DexIDOPool Test', () => {
         expect(await dexIDOPool.availableToExchange(user3.address)).to.equal(expandTo18Decimals(2750))
 
     })
+
+*/
+    it('Withdraw', async () => {
+        const { timestamp: now } = await provider.getBlock('latest')
+
+        await dexIDOPool.deploy(now + 2 * MINUTES, 5 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) })
+
+        await mineBlock(provider, now + 3 * MINUTES)
+
+        await expect(dexIDOPool.connect(user).withdraw(0))
+            .to.be.revertedWith('DexIDOPool::withdraw: the pool is not over, amount is invalid.')
+
+        await dexIDOPool.connect(top).deposit({ value: expandTo18Decimals(2) })
+        await dexIDOPool.connect(user).accept(top.address)
+        await dexIDOPool.connect(user).deposit({ value: expandTo18Decimals(2) })
+
+        await expect(dexIDOPool.connect(user).withdraw(expandTo18Decimals(3)))
+            .to.be.revertedWith('DexIDOPool::withdraw: the amount deposited today is not enough.')
+
+        await dexIDOPool.connect(user).withdraw(expandTo18Decimals(1))
+
+        await mineBlock(provider, now + 3 * DAYS)
+
+        await expect(dexIDOPool.connect(user).withdraw(0))
+            .to.be.revertedWith('DexIDOPool::withdraw: the pool is not over, amount is invalid.')
+
+        await mineBlock(provider, now + 6 * DAYS)
+
+        await expect(await dexIDOPool.connect(user).withdraw(1))
+            .to.changeEtherBalance(user, expandTo18Decimals(1), {includeFee: false})
+
+        const totalDeposit = await dexIDOPool.totalDeposit();
+        await expect(totalDeposit).to.equal(expandTo18Decimals(2))
+
+        const balance = await dexIDOPool.balanceOf(user.address)
+        await expect(balance).to.equal(expandTo18Decimals(0))
+    })
+
+    it('正常取消质押', async () => {
+        const { timestamp: now } = await provider.getBlock('latest')
+
+        await dexIDOPool.deploy(now + 2 * MINUTES, 5 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) })
+
+        await mineBlock(provider, now + 3 * MINUTES)
+
+        await dexIDOPool.connect(top).deposit({ value: expandTo18Decimals(2) })
+
+        await expect(dexIDOPool.connect(top).withdraw(0))
+            .to.be.revertedWith('DexIDOPool::withdraw: the pool is not over, amount is invalid.')
+
+        await expect(dexIDOPool.connect(top).withdraw(expandTo18Decimals(3)))
+            .to.be.revertedWith('DexIDOPool::withdraw: the amount deposited today is not enough.')
+
+        await expect(dexIDOPool.connect(top).withdraw(expandTo18Decimals(1)))
+            .to.emit(dexIDOPool, 'Withdrawn').withArgs(top.address, expandTo18Decimals(1))
+
+        await expect(dexIDOPool.connect(top).withdraw(expandTo18Decimals(1)))
+            .to.emit(dexIDOPool, 'Withdrawn').withArgs(top.address, expandTo18Decimals(1))
+
+        await expect(dexIDOPool.connect(top).withdraw(expandTo18Decimals(1)))
+            .to.be.revertedWith('DexIDOPool::withdraw: the amount deposited today is not enough.')
+
+    })
+
+    it('矿池结束后取消质押', async () => {
+        const { timestamp: now } = await provider.getBlock('latest')
+
+        await dexIDOPool.deploy(now + 2 * MINUTES, 5 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) })
+
+        await mineBlock(provider, now + 3 * MINUTES)
+
+        await dexIDOPool.connect(top).deposit({ value: expandTo18Decimals(2) })
+        await dexIDOPool.connect(top).deposit({ value: expandTo18Decimals(2) })
+        await dexIDOPool.connect(top).deposit({ value: expandTo18Decimals(2) })
+
+        expect(await dexIDOPool.balanceOf(top.address)).to.equal(expandTo18Decimals(6))
+
+
+        //矿池结束
+        await mineBlock(provider, now + 5 * DAYS + 3 * MINUTES)
+
+        // await expect(dexIDOPool.connect(top).withdraw(expandTo18Decimals(70)))
+        //     .to.be.revertedWith('DexIDOPool::withdraw: the amount deposited today is not enough.')
+
+        // await expect(dexIDOPool.connect(top).withdraw(expandTo18Decimals(1)))
+        //     .to.emit(dexIDOPool, 'Withdrawn').withArgs(top.address, expandTo18Decimals(1))
+
+        // await expect(dexIDOPool.connect(top).withdraw(expandTo18Decimals(6)))
+        // .to.be.revertedWith('DexIDOPool::withdraw: the amount deposited today is not enough.')
+
+        // await expect(dexIDOPool.connect(top).withdraw(expandTo18Decimals(5)))
+        //     .to.emit(dexIDOPool, 'Withdrawn').withArgs(top.address, expandTo18Decimals(5))
+
+    })
+
+
 /*
+    it('Contract stoppable', async () => {
+
+        await dexIDOPool.stop()
+        await expect(await dexIDOPool.stopped()).to.equal(true);
+
+        var { timestamp: now } = await provider.getBlock('latest')
+
+        await expect(dexIDOPool.deploy(now + 2 * MINUTES, 5 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) }))
+            .to.be.revertedWith('DexIDOPool::stoppable: contract has been stopped.')
+
+        now = now + 3 * MINUTES
+        await mineBlock(provider, now)
+
+        await expect(dexIDOPool.connect(user).withdraw(0))
+            .to.be.revertedWith('DexIDOPool::stoppable: contract has been stopped.');
+
+        await expect(dexIDOPool.connect(user).start())
+            .to.be.revertedWith("Ownable: caller is not the owner")
+
+        await dexIDOPool.start()
+        await expect(await dexIDOPool.stopped()).to.equal(false);
+
+        await expect(dexIDOPool.deploy(now + 2 * MINUTES, 5 * DAYS, 50, dexchangeCore.address, top.address, { value: expandTo18Decimals(100000) }))
+            .to.emit(dexIDOPool, 'Deployed')
+    })
+
+
     it('Accept invitation', async () => {
 
         var { timestamp: now } = await provider.getBlock('latest')
@@ -749,5 +831,5 @@ describe('DexIDOPool Test', () => {
         await expect(poolAfter.sub(poolBefore)).be.equal(totalAmount)
 
     })
-    */
+*/    
 })
