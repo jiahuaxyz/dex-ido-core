@@ -27,7 +27,7 @@ describe('DexIDOPool Test', () => {
         dexIDOPool = fixture.dexIDOPool
         await dexchangeCore.setPrice(testERC20.address, expandTo18Decimals(2))
     })
-/*
+
     it('Deploy pool', async () => {
 
         const { timestamp: now } = await provider.getBlock('latest')
@@ -354,7 +354,7 @@ describe('DexIDOPool Test', () => {
 
     })
 
-*/
+
     it('Withdraw', async () => {
         const { timestamp: now } = await provider.getBlock('latest')
 
@@ -449,7 +449,7 @@ describe('DexIDOPool Test', () => {
     })
 
 
-/*
+
     it('Contract stoppable', async () => {
 
         await dexIDOPool.stop()
@@ -831,5 +831,4 @@ describe('DexIDOPool Test', () => {
         await expect(poolAfter.sub(poolBefore)).be.equal(totalAmount)
 
     })
-*/    
 })
